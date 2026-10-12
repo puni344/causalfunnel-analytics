@@ -22,7 +22,7 @@ export function Sidebar({ activeTab, onSelectTab }) {
       id: "heatmap",
       label: "Heatmap",
       icon: "🔥",
-      badge: "Stage 7",
+      badge: null,
     },
   ];
 

@@ -7,7 +7,15 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { get, fetchSessions, fetchSessionEvents, ApiError, API_BASE_URL } from "../src/api/client.js";
+import {
+  get,
+  fetchSessions,
+  fetchSessionEvents,
+  fetchPages,
+  fetchPageClicks,
+  ApiError,
+  API_BASE_URL,
+} from "../src/api/client.js";
 
 describe("Frontend API Client — client/src/api/client.js", () => {
   it("exports a valid API_BASE_URL defaulting to localhost:4000", () => {
@@ -199,6 +207,87 @@ describe("Frontend API Client — client/src/api/client.js", () => {
         assert.ok(err instanceof ApiError);
         assert.strictEqual(err.status, 400);
         assert.match(err.message, /Session ID is required/);
+        return true;
+      }
+    );
+  });
+
+  it("fetchPages requests GET /api/pages and returns page summaries", async () => {
+    let requestedUrl = null;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      requestedUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          data: [
+            {
+              pageUrl: "http://localhost:4000/demo/index.html",
+              pageViews: 10,
+              clicks: 15,
+            },
+          ],
+        }),
+      };
+    };
+
+    try {
+      const result = await fetchPages();
+      assert.ok(requestedUrl);
+      assert.ok(requestedUrl.endsWith("/api/pages"));
+      assert.strictEqual(result.data.length, 1);
+      assert.strictEqual(result.data[0].pageViews, 10);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fetchPageClicks requests GET /api/clicks with encoded pageUrl", async () => {
+    let requestedUrl = null;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      requestedUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          data: [
+            {
+              eventId: "clk_1",
+              type: "click",
+              click: { x: 100, y: 200, pageX: 100, pageY: 350 },
+            },
+          ],
+          meta: { count: 1, truncated: false },
+        }),
+      };
+    };
+
+    try {
+      const targetUrl = "http://localhost:4000/demo/index.html?test=1#anchor";
+      const result = await fetchPageClicks(targetUrl);
+      assert.ok(requestedUrl);
+      assert.ok(requestedUrl.includes("/api/clicks?pageUrl="));
+      assert.ok(requestedUrl.includes(encodeURIComponent(targetUrl)));
+      assert.strictEqual(result.data.length, 1);
+      assert.strictEqual(result.meta.truncated, false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fetchPageClicks rejects when pageUrl is missing or empty", async () => {
+    await assert.rejects(
+      async () => {
+        await fetchPageClicks("");
+      },
+      (err) => {
+        assert.ok(err instanceof ApiError);
+        assert.strictEqual(err.status, 400);
+        assert.match(err.message, /pageUrl is required/);
         return true;
       }
     );

@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "./components/AppLayout.jsx";
 import { SessionsPage } from "./pages/SessionsPage.jsx";
 import { SessionJourneyPage } from "./pages/SessionJourneyPage.jsx";
-import { PlaceholderPage } from "./pages/PlaceholderPage.jsx";
+import { HeatmapPage } from "./pages/HeatmapPage.jsx";
 
 import { parseRoute } from "./utils/journeyUtils.js";
 
@@ -121,19 +121,7 @@ export default function App() {
         )
       )}
 
-      {route.tab === "heatmap" && (
-        <PlaceholderPage
-          title="Visual Click Heatmaps"
-          stageNumber={7}
-          description="Spatial click density overlays rendered on top of the live demo website."
-          features={[
-            "Preview target webpage inside isolated iframe with analytics disabled",
-            "Render colored click density points from GET /api/clicks",
-            "Automatic URL canonicalization and page matching",
-            "Supports high-density click clusters up to 5,000 data points",
-          ]}
-        />
-      )}
+      {route.tab === "heatmap" && <HeatmapPage />}
     </AppLayout>
   );
 }

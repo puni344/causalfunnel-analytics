@@ -108,3 +108,32 @@ export async function fetchSessionEvents(sessionId, { signal } = {}) {
     signal,
   });
 }
+
+/**
+ * Fetches the list of tracked pages with aggregate pageViews and clicks.
+ *
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<{ data: Array<{ pageUrl: string, pageViews: number, clicks: number }> }>}
+ */
+export async function fetchPages({ signal } = {}) {
+  return get("/api/pages", { signal });
+}
+
+/**
+ * Fetches click events for a specific page URL.
+ *
+ * @param {string} pageUrl
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<{ data: Array, meta: { count: number, truncated: boolean } }>}
+ */
+export async function fetchPageClicks(pageUrl, { signal } = {}) {
+  if (!pageUrl) {
+    throw new ApiError(400, "pageUrl is required");
+  }
+  return get(`/api/clicks?pageUrl=${encodeURIComponent(pageUrl)}`, {
+    signal,
+  });
+}
+
