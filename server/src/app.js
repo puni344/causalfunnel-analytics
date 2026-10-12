@@ -10,6 +10,7 @@ import express from "express";
 import cors from "cors";
 import env from "./config/env.js";
 import healthRouter from "./routes/health.js";
+import eventsRouter from "./routes/events.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -32,6 +33,7 @@ app.use(express.json({ limit: "100kb" }));
 
 // ── Routes ────────────────────────────────────────────────
 app.use("/api/health", healthRouter);
+app.use("/api/events", eventsRouter);
 
 // ── Error handling ────────────────────────────────────────
 // Must come after all routes.
