@@ -91,3 +91,20 @@ export async function fetchSessions({ page = 1, limit = 20, signal } = {}) {
     signal,
   });
 }
+
+/**
+ * Fetches the chronological event list for a single session.
+ *
+ * @param {string} sessionId
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<{ data: Array, meta: { count: number } }>}
+ */
+export async function fetchSessionEvents(sessionId, { signal } = {}) {
+  if (!sessionId) {
+    throw new ApiError(400, "Session ID is required");
+  }
+  return get(`/api/sessions/${encodeURIComponent(sessionId)}/events`, {
+    signal,
+  });
+}

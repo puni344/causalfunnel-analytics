@@ -7,7 +7,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { get, fetchSessions, ApiError, API_BASE_URL } from "../src/api/client.js";
+import { get, fetchSessions, fetchSessionEvents, ApiError, API_BASE_URL } from "../src/api/client.js";
 
 describe("Frontend API Client — client/src/api/client.js", () => {
   it("exports a valid API_BASE_URL defaulting to localhost:4000", () => {
@@ -154,4 +154,54 @@ describe("Frontend API Client — client/src/api/client.js", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("fetchSessionEvents requests GET /api/sessions/:sessionId/events with encoded ID", async () => {
+    let requestedUrl = null;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      requestedUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
+          data: [
+            {
+              eventId: "ev_1",
+              sessionId: "sess_abc-123",
+              type: "page_view",
+              pageUrl: "http://localhost:4000/demo/index.html",
+              timestamp: "2026-10-12T10:00:00.000Z",
+            },
+          ],
+          meta: { count: 1 },
+        }),
+      };
+    };
+
+    try {
+      const result = await fetchSessionEvents("sess_abc-123");
+      assert.ok(requestedUrl);
+      assert.ok(requestedUrl.includes("/api/sessions/sess_abc-123/events"));
+      assert.strictEqual(result.data.length, 1);
+      assert.strictEqual(result.meta.count, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fetchSessionEvents rejects when sessionId is empty or omitted", async () => {
+    await assert.rejects(
+      async () => {
+        await fetchSessionEvents("");
+      },
+      (err) => {
+        assert.ok(err instanceof ApiError);
+        assert.strictEqual(err.status, 400);
+        assert.match(err.message, /Session ID is required/);
+        return true;
+      }
+    );
+  });
 });
+

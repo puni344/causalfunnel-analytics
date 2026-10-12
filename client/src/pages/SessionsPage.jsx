@@ -45,7 +45,7 @@ function formatUrl(url) {
   }
 }
 
-export function SessionsPage() {
+export function SessionsPage({ onSelectSession }) {
   const [sessions, setSessions] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -214,8 +214,18 @@ export function SessionsPage() {
                   return (
                     <tr
                       key={session.sessionId}
-                      onClick={() => setSelectedSessionId(session.sessionId)}
+                      onClick={(e) => {
+                        // Prevent unintended navigation if clicking another nested interactive control
+                        if (e.target.closest("button, a, input, select, textarea")) {
+                          return;
+                        }
+                        setSelectedSessionId(session.sessionId);
+                        if (onSelectSession) {
+                          onSelectSession(session.sessionId);
+                        }
+                      }}
                       className={`session-row ${isSelected ? "selected-row" : ""}`}
+                      title="Click row to inspect session journey"
                     >
                       <td className="session-id-cell">
                         <span
@@ -263,10 +273,16 @@ export function SessionsPage() {
                         <button
                           type="button"
                           className="btn btn-outline btn-xs view-journey-btn"
-                          disabled
-                          title="Detailed session timeline will be unlocked in Stage 6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSessionId(session.sessionId);
+                            if (onSelectSession) {
+                              onSelectSession(session.sessionId);
+                            }
+                          }}
+                          title={`View session journey for ${session.sessionId}`}
                         >
-                          Journey (Stage 6)
+                          View Journey &rarr;
                         </button>
                       </td>
                     </tr>

@@ -16,7 +16,7 @@ export function Sidebar({ activeTab, onSelectTab }) {
       id: "journey",
       label: "User Journey",
       icon: "🗺️",
-      badge: "Stage 6",
+      badge: null,
     },
     {
       id: "heatmap",
