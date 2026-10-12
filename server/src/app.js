@@ -11,6 +11,9 @@ import cors from "cors";
 import env from "./config/env.js";
 import healthRouter from "./routes/health.js";
 import eventsRouter from "./routes/events.js";
+import sessionsRouter from "./routes/sessions.js";
+import pagesRouter from "./routes/pages.js";
+import clicksRouter from "./routes/clicks.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -34,6 +37,9 @@ app.use(express.json({ limit: "100kb" }));
 // ── Routes ────────────────────────────────────────────────
 app.use("/api/health", healthRouter);
 app.use("/api/events", eventsRouter);
+app.use("/api/sessions", sessionsRouter);
+app.use("/api/pages", pagesRouter);
+app.use("/api/clicks", clicksRouter);
 
 // ── Error handling ────────────────────────────────────────
 // Must come after all routes.
