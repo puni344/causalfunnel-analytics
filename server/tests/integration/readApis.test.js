@@ -49,6 +49,10 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
   const SESSION_ALPHA = `${TEST_PREFIX}alpha_12345`;
   const SESSION_BETA = `${TEST_PREFIX}beta_67890`;
   const SESSION_GAMMA = `${TEST_PREFIX}gamma_11223`;
+  const PAGE_HOME = `https://example.com/${TEST_PREFIX}home`;
+  const PAGE_PRODUCTS = `https://example.com/${TEST_PREFIX}products`;
+  const PAGE_PRICING = `https://example.com/${TEST_PREFIX}pricing`;
+  const PAGE_BLOG = `https://example.com/${TEST_PREFIX}blog`;
 
   before(async () => {
     await connectDB();
@@ -116,7 +120,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         makeDoc({
           sessionId: SESSION_GAMMA,
           type: "page_view",
-          pageUrl: "https://example.com/blog",
+          pageUrl: PAGE_BLOG,
           timestamp: new Date("2026-10-12T09:00:00.000Z"),
         }),
 
@@ -124,13 +128,13 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         makeDoc({
           sessionId: SESSION_ALPHA,
           type: "page_view",
-          pageUrl: "https://example.com/home?utm_source=twitter", // will normalize to /home
+          pageUrl: `${PAGE_HOME}?utm_source=twitter`, // will normalize to PAGE_HOME
           timestamp: new Date("2026-10-12T10:00:00.000Z"),
         }),
         makeDoc({
           sessionId: SESSION_ALPHA,
           type: "click",
-          pageUrl: "https://example.com/home",
+          pageUrl: PAGE_HOME,
           timestamp: new Date("2026-10-12T10:01:00.000Z"),
           click: {
             x: 50,
@@ -143,13 +147,13 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         makeDoc({
           sessionId: SESSION_ALPHA,
           type: "page_view",
-          pageUrl: "https://example.com/products",
+          pageUrl: PAGE_PRODUCTS,
           timestamp: new Date("2026-10-12T10:02:00.000Z"),
         }),
         makeDoc({
           sessionId: SESSION_ALPHA,
           type: "click",
-          pageUrl: "https://example.com/products",
+          pageUrl: PAGE_PRODUCTS,
           timestamp: new Date("2026-10-12T10:03:00.000Z"),
           click: {
             x: 100,
@@ -164,13 +168,13 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         makeDoc({
           sessionId: SESSION_BETA,
           type: "page_view",
-          pageUrl: "https://example.com/pricing",
+          pageUrl: PAGE_PRICING,
           timestamp: new Date("2026-10-12T11:00:00.000Z"),
         }),
         makeDoc({
           sessionId: SESSION_BETA,
           type: "click",
-          pageUrl: "https://example.com/pricing",
+          pageUrl: PAGE_PRICING,
           timestamp: new Date("2026-10-12T11:05:00.000Z"),
           click: {
             x: 200,
@@ -183,7 +187,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         makeDoc({
           sessionId: SESSION_BETA,
           type: "click",
-          pageUrl: "https://example.com/pricing",
+          pageUrl: PAGE_PRICING,
           timestamp: new Date("2026-10-12T11:10:00.000Z"),
           click: {
             x: 220,
@@ -228,7 +232,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         new Date(alpha.lastEventAt).toISOString(),
         "2026-10-12T10:03:00.000Z"
       );
-      assert.strictEqual(alpha.entryPage, "https://example.com/home");
+      assert.strictEqual(alpha.entryPage, PAGE_HOME);
 
       // Verify Session Beta metrics
       assert.strictEqual(beta.totalEvents, 3);
@@ -242,7 +246,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
         new Date(beta.lastEventAt).toISOString(),
         "2026-10-12T11:10:00.000Z"
       );
-      assert.strictEqual(beta.entryPage, "https://example.com/pricing");
+      assert.strictEqual(beta.entryPage, PAGE_PRICING);
 
       // Verify newest-first ordering (Beta > Alpha > Gamma)
       const betaIdx = body.data.findIndex((s) => s.sessionId === SESSION_BETA);
@@ -319,7 +323,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
       assert.strictEqual(first.__v, undefined);
       assert.strictEqual(first.receivedAt, undefined);
       assert.strictEqual(first.type, "page_view");
-      assert.strictEqual(first.pageUrl, "https://example.com/home");
+      assert.strictEqual(first.pageUrl, PAGE_HOME);
       assert.ok(first.eventId);
       assert.ok(first.viewport);
       assert.ok(first.pageDimensions);
@@ -352,10 +356,10 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
 
       assert.ok(Array.isArray(body.data));
 
-      const pricing = body.data.find((p) => p.pageUrl === "https://example.com/pricing");
-      const home = body.data.find((p) => p.pageUrl === "https://example.com/home");
-      const products = body.data.find((p) => p.pageUrl === "https://example.com/products");
-      const blog = body.data.find((p) => p.pageUrl === "https://example.com/blog");
+      const pricing = body.data.find((p) => p.pageUrl === PAGE_PRICING);
+      const home = body.data.find((p) => p.pageUrl === PAGE_HOME);
+      const products = body.data.find((p) => p.pageUrl === PAGE_PRODUCTS);
+      const blog = body.data.find((p) => p.pageUrl === PAGE_BLOG);
 
       assert.ok(pricing, "Pricing page must be tracked");
       assert.strictEqual(pricing.pageViews, 1);
@@ -394,7 +398,7 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
     // ── API 4: GET /api/clicks?pageUrl=... ─────────────────
     it("GET /api/clicks retrieves only clicks for the requested page", async () => {
       const res = await fetch(
-        `${BASE_URL}/api/clicks?pageUrl=${encodeURIComponent("https://example.com/pricing")}`
+        `${BASE_URL}/api/clicks?pageUrl=${encodeURIComponent(PAGE_PRICING)}`
       );
       assert.strictEqual(res.status, 200);
       const body = await res.json();
@@ -422,14 +426,14 @@ describe("Stage 3 Read APIs — Integration Tests", () => {
 
     it("GET /api/clicks normalizes query URL (strips query parameters and fragments)", async () => {
       // Query with query param and hash fragment: ?ref=google#pricing-table
-      const rawUrl = "https://example.com/pricing?ref=google#pricing-table";
+      const rawUrl = `${PAGE_PRICING}?ref=google#pricing-table`;
       const res = await fetch(
         `${BASE_URL}/api/clicks?pageUrl=${encodeURIComponent(rawUrl)}`
       );
       assert.strictEqual(res.status, 200);
       const body = await res.json();
 
-      // Should match the normalized https://example.com/pricing events
+      // Should match the normalized PAGE_PRICING events
       assert.strictEqual(body.meta.count, 2);
       assert.strictEqual(body.meta.truncated, false);
     });

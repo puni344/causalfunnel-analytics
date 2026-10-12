@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CausalFunnel Analytics Demo — Home</title>
+  <link rel="stylesheet" href="./demo.css">
+  <!-- Analytics tracking script -->
+  <script src="/tracker.js" data-api-url="/api/events"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="./index.html" class="nav-brand">CausalFunnel Demo</a>
+    <div class="nav-links">
+      <a href="./index.html" class="nav-link active">Home</a>
+      <a href="./about.html" id="nav-about-link" class="nav-link">About Page</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Event Analytics Demo — Home Page</h1>
+      <p>
+        This test site demonstrates zero-latency user interaction capture.
+        Page views and click coordinates are automatically collected and dispatched.
+      </p>
+      <div class="button-group">
+        <button id="btn-hero-primary" class="btn btn-primary">Get Started</button>
+        <button id="btn-hero-secondary" class="btn btn-secondary">Explore Features</button>
+        <a href="./about.html" id="link-hero-about" class="btn btn-outline">Go to About</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Card Alpha</h2>
+        <p>Test click capturing inside card containers with specific element IDs.</p>
+        <button id="btn-card-alpha" class="btn btn-primary">Action Alpha</button>
+      </div>
+
+      <div class="card">
+        <h2>Card Beta</h2>
+        <p>Verifies target tag and class resolution for analytics journey mapping.</p>
+        <button id="btn-card-beta" class="btn btn-secondary">Action Beta</button>
+      </div>
+
+      <div class="card">
+        <h2>Card Gamma</h2>
+        <p>Ensures bounding coordinates stay clamped within layout constraints.</p>
+        <button id="btn-card-gamma" class="btn btn-accent">Action Gamma</button>
+      </div>
+    </section>
+
+    <!-- Tall Section to test Scrolling & Document Coordinates (pageY > clientY) -->
+    <section class="tall-section">
+      <h2>Scrollable Workspace</h2>
+      <p>Scroll down to test click coordinates at various vertical offsets.</p>
+
+      <div class="milestone" style="margin-top: 300px;">
+        <h3>Milestone 1 (Y ≈ 600px)</h3>
+        <p>Mid-page interactive element to verify partial scroll delta.</p>
+        <button id="btn-mid-scroll" class="btn btn-secondary">Midpoint Click</button>
+      </div>
+
+      <div class="milestone" style="margin-top: 500px;">
+        <h3>Milestone 2 — Deep Scroll (Y > 1200px)</h3>
+        <p>
+          Clicks on this button will have <code>pageY</code> substantially higher than
+          <code>clientY</code>, validating document-relative coordinate translation.
+        </p>
+        <button id="btn-deep-scroll" class="btn btn-accent">Deep Scroll Click</button>
+      </div>
+    </section>
+
+    <div class="scroll-spacer">
+      <h3>Ready to navigate?</h3>
+      <p>Clicking to the About page tests session continuity across full page loads.</p>
+      <a href="./about.html" id="link-bottom-about" class="btn btn-primary">Navigate to About Page</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>CausalFunnel Analytics Demo &bull; Technical Assignment Demonstration</p>
+    <button id="btn-footer-feedback" class="btn btn-outline">Send Feedback</button>
+  </footer>
+</body>
+</html>

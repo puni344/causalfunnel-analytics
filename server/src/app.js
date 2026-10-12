@@ -6,6 +6,8 @@
 // Keeping them separate makes the app easier to test.
 // ─────────────────────────────────────────────────────────
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import env from "./config/env.js";
@@ -16,6 +18,11 @@ import pagesRouter from "./routes/pages.js";
 import clicksRouter from "./routes/clicks.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const trackerPath = path.resolve(__dirname, "../../tracker/tracker.js");
+const demoDirPath = path.resolve(__dirname, "../../demo");
 
 const app = express();
 
@@ -34,7 +41,16 @@ app.use(
 // 100 KB limit keeps the server safe from oversized payloads.
 app.use(express.json({ limit: "100kb" }));
 
-// ── Routes ────────────────────────────────────────────────
+// ── Static assets ─────────────────────────────────────────
+// Serves standalone plain-JS tracking script
+app.get("/tracker.js", (_req, res) => {
+  res.sendFile(trackerPath, { dotfiles: "allow" });
+});
+
+// Serves the two-page demo website
+app.use("/demo", express.static(demoDirPath));
+
+// ── API Routes ────────────────────────────────────────────
 app.use("/api/health", healthRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/sessions", sessionsRouter);
