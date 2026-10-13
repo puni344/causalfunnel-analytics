@@ -14,6 +14,8 @@ import {
   calculatePreviewDimensions,
   computeHeatmapSummary,
   drawHeatmapToCanvas,
+  getAvailableViewportWidths,
+  projectClickToCanvas,
 } from "../src/utils/heatmapUtils.js";
 
 describe("Heatmap — Viewport Classification", () => {
@@ -229,5 +231,218 @@ describe("Heatmap — Preview Dimensions & Summaries", () => {
     drawHeatmapToCanvas(mockCanvas, [{ x: 100, y: 200 }, { x: 300, y: 400 }]);
     assert.strictEqual(clearRectCalled, true);
     assert.ok(arcCount >= 2);
+  });
+});
+
+describe("Heatmap — Resolution-Aware Alignment & Projection", () => {
+  // Test 1: Width-matched events use their actual recorded viewport width
+  it("extracts distinct recorded viewport widths accurately", () => {
+    const sampleEvents = [
+      { viewport: { width: 1440 } },
+      { viewport: { width: 1440 } },
+      { viewport: { width: 1920 } },
+      { viewport: { width: 1200 } },
+      { viewport: { width: 390 } },
+      { viewport: { width: 0 } }, // invalid
+      { viewport: null },
+    ];
+
+    const widths = getAvailableViewportWidths(sampleEvents, "all");
+    assert.deepStrictEqual(widths, [
+      { width: 1920, count: 1 },
+      { width: 1440, count: 2 },
+      { width: 1200, count: 1 },
+      { width: 390, count: 1 },
+    ]);
+
+    const desktopWidths = getAvailableViewportWidths(sampleEvents, "desktop");
+    assert.deepStrictEqual(desktopWidths, [
+      { width: 1920, count: 1 },
+      { width: 1440, count: 2 },
+      { width: 1200, count: 1 },
+    ]);
+  });
+
+  // Test 2: A centered max-width container aligns at its matching preview width
+  it("aligns a centered max-width container element at matching preview width (offset = 0px)", () => {
+    // In a 1440px viewport with a 1000px centered container (left margin = 220px),
+    // an element 311px inside the container has pageX = 220 + 311 = 531px.
+    const event1440 = {
+      click: { pageX: 531, pageY: 338 },
+      pageDimensions: { width: 1440, height: 2691 },
+      viewport: { width: 1440, height: 900 },
+    };
+
+    const previewDims1440 = { width: 1440, height: 2691 };
+    const projected = projectClickToCanvas(event1440, previewDims1440);
+
+    assert.ok(projected);
+    assert.strictEqual(projected.isExact, true);
+    assert.strictEqual(projected.x, 531);
+    assert.strictEqual(projected.y, 338);
+
+    // Physical target in 1440px iframe is also at 220 + 311 = 531px.
+    const targetCenterIn1440Iframe = 531;
+    const offset = Math.abs(projected.x - targetCenterIn1440Iframe);
+    assert.ok(offset <= 10, `Expected offset <= 10px, got ${offset}px`);
+    assert.strictEqual(offset, 0);
+  });
+
+  // Test 3: A 1200px event is not silently treated as an exact 1440px event
+  it("does not treat a 1200px event as exact when rendered in a 1440px preview", () => {
+    // In a 1200px viewport (left margin = 100px), element at 311px has pageX = 100 + 311 = 411px.
+    const event1200 = {
+      click: { pageX: 411, pageY: 338 },
+      pageDimensions: { width: 1200, height: 2691 },
+      viewport: { width: 1200, height: 800 },
+    };
+
+    const previewDims1440 = { width: 1440, height: 2691 };
+    const projected = projectClickToCanvas(event1200, previewDims1440);
+
+    assert.ok(projected);
+    assert.strictEqual(projected.isExact, false); // Not exact
+    // Proportional projection: (411 / 1200) * 1440 = 493.2px
+    assert.strictEqual(projected.x, (411 / 1200) * 1440);
+    // In 1440px iframe, target is at 531px, showing that 1200px and 1440px cannot be treated identically
+    const targetIn1440 = 531;
+    assert.notStrictEqual(projected.x, targetIn1440);
+  });
+
+  // Test 4: A 1440px event aligns when rendered at a compatible 1440px preview
+  it("aligns a 1440px event on Card Alpha when rendered at a compatible 1440px preview", () => {
+    // Card Alpha in column 1: xe = 126.5px. In 1440px viewport: pageX = 220 + 126.5 = 346.5px.
+    const eventCardAlpha1440 = {
+      click: { pageX: 346.5, pageY: 652 },
+      pageDimensions: { width: 1440, height: 2691 },
+      viewport: { width: 1440, height: 900 },
+    };
+
+    const previewDims = calculatePreviewDimensions([eventCardAlpha1440], "desktop", 1440);
+    assert.strictEqual(previewDims.width, 1440);
+    assert.strictEqual(previewDims.isWidthMatched, true);
+
+    const projected = projectClickToCanvas(eventCardAlpha1440, previewDims);
+    assert.ok(projected);
+    assert.strictEqual(projected.isExact, true);
+    assert.strictEqual(projected.x, 346.5);
+    assert.strictEqual(projected.y, 652);
+
+    const targetCenter = 220 + 126.5;
+    assert.strictEqual(Math.abs(projected.x - targetCenter), 0);
+  });
+
+  // Test 5: A 1920px event aligns when rendered at a compatible 1920px preview
+  it("aligns a 1920px event on Card Alpha when rendered at a compatible 1920px preview", () => {
+    // In 1920px viewport (left margin = 460px): pageX = 460 + 126.5 = 586.5px.
+    const eventCardAlpha1920 = {
+      click: { pageX: 586.5, pageY: 652 },
+      pageDimensions: { width: 1920, height: 2691 },
+      viewport: { width: 1920, height: 1080 },
+    };
+
+    const previewDims = calculatePreviewDimensions([eventCardAlpha1920], "desktop", 1920);
+    assert.strictEqual(previewDims.width, 1920);
+    assert.strictEqual(previewDims.isWidthMatched, true);
+
+    const projected = projectClickToCanvas(eventCardAlpha1920, previewDims);
+    assert.ok(projected);
+    assert.strictEqual(projected.isExact, true);
+    assert.strictEqual(projected.x, 586.5);
+    assert.strictEqual(projected.y, 652);
+
+    const targetCenter = 460 + 126.5;
+    assert.strictEqual(Math.abs(projected.x - targetCenter), 0);
+  });
+
+  // Test 6: The All profile is explicitly approximate when widths differ
+  it("labels projection as non-exact when rendered in an aggregate preview with differing widths", () => {
+    // 1920px click rendered on 1200px aggregate preview
+    const event1920 = {
+      click: { pageX: 586.5, pageY: 652 },
+      pageDimensions: { width: 1920, height: 2691 },
+      viewport: { width: 1920, height: 1080 },
+    };
+
+    const previewDims1200 = calculatePreviewDimensions([event1920], "all", null);
+    assert.strictEqual(previewDims1200.width, 1200);
+    assert.strictEqual(previewDims1200.isWidthMatched, false);
+
+    const projected = projectClickToCanvas(event1920, previewDims1200);
+    assert.ok(projected);
+    assert.strictEqual(projected.isExact, false); // Approximate
+
+    // Projected position drifts from what a 1200px container element would be (226.5px)
+    const expectedApproxX = (586.5 / 1920) * 1200; // ~366.56px
+    assert.strictEqual(projected.x, expectedApproxX);
+    const targetIn1200 = 100 + 126.5; // 226.5px
+    const offset = Math.abs(projected.x - targetIn1200);
+    assert.ok(offset > 100, `Expected large drift in aggregate mode, got ${offset}px`);
+  });
+
+  // Test 7: Invalid dimensions and absent coordinates do not generate invalid drawing positions
+  it("returns null safely for invalid dimensions, absent coordinates, and zero widths", () => {
+    const validDims = { width: 1440, height: 2000 };
+
+    assert.strictEqual(projectClickToCanvas(null, validDims), null);
+    assert.strictEqual(projectClickToCanvas({}, validDims), null);
+    assert.strictEqual(projectClickToCanvas({ click: null }, validDims), null);
+    assert.strictEqual(projectClickToCanvas({ click: { pageX: NaN, pageY: 100 } }, validDims), null);
+    assert.strictEqual(projectClickToCanvas({ click: { pageX: -5, pageY: 100 } }, validDims), null);
+
+    // Invalid preview dimensions
+    const validEvent = { click: { pageX: 100, pageY: 200 }, pageDimensions: { width: 1440, height: 2000 } };
+    assert.strictEqual(projectClickToCanvas(validEvent, null), null);
+    assert.strictEqual(projectClickToCanvas(validEvent, { width: 0, height: 2000 }), null);
+    assert.strictEqual(projectClickToCanvas(validEvent, { width: -100, height: 2000 }), null);
+    assert.strictEqual(projectClickToCanvas(validEvent, { width: 1440, height: 0 }), null);
+  });
+
+  // Test 8: Preview height is derived from the selected width population rather than unrelated viewport profiles
+  it("derives preview height strictly from the selected width population without mixing mobile heights", () => {
+    const desktop1440Events = [
+      {
+        viewport: { width: 1440 },
+        pageDimensions: { width: 1440, height: 2691 },
+      },
+    ];
+
+    const mobileEvents = [
+      {
+        viewport: { width: 390 },
+        pageDimensions: { width: 390, height: 3474 },
+      },
+    ];
+
+    // When desktop1440Events is the filtered population:
+    const desktopDims = calculatePreviewDimensions(desktop1440Events, "desktop", 1440);
+    assert.strictEqual(desktopDims.height, 2691); // Not 3474!
+
+    // When mobile is selected:
+    const mobileDims = calculatePreviewDimensions(mobileEvents, "mobile", 390);
+    assert.strictEqual(mobileDims.height, 3474);
+  });
+
+  // Test 9: Existing Mobile, Desktop and All filtering still works
+  it("preserves backward-compatible profile filtering without selectedWidth", () => {
+    const events = [
+      { viewport: { width: 1440 } },
+      { viewport: { width: 1920 } },
+      { viewport: { width: 800 } },  // intermediate
+      { viewport: { width: 390 } },  // mobile
+    ];
+
+    const all = filterEventsByViewport(events, "all");
+    assert.strictEqual(all.length, 4);
+
+    const desktop = filterEventsByViewport(events, "desktop");
+    assert.strictEqual(desktop.length, 2);
+
+    const mobile = filterEventsByViewport(events, "mobile");
+    assert.strictEqual(mobile.length, 1);
+
+    // With specific width filter:
+    const specific1440 = filterEventsByViewport(events, "desktop", 1440);
+    assert.strictEqual(specific1440.length, 1);
   });
 });

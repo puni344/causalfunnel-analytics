@@ -113,51 +113,223 @@ export function normalizeClickCoordinate(event) {
 }
 
 /**
- * Filters click events by responsive viewport profile.
+ * Extracts distinct recorded viewport widths from events matching the given profile.
  *
  * @param {Array} events
- * @param {"all" | "desktop" | "mobile"} profile
- * @returns {Array}
+ * @param {"all" | "desktop" | "mobile"} [profile="all"]
+ * @returns {Array<{ width: number, count: number }>} Sorted descending by width
  */
-export function filterEventsByViewport(events = [], profile = "all") {
+export function getAvailableViewportWidths(events = [], profile = "all") {
   if (!Array.isArray(events)) return [];
-  if (profile === "all") return events;
+  const matching = profile === "all" ? events : filterEventsByViewport(events, profile, null);
+  const countByWidth = new Map();
 
-  return events.filter((ev) => {
-    const width = ev.viewport?.width;
-    const category = classifyViewport(width);
-    return category === profile;
-  });
+  for (const ev of matching) {
+    const w = ev.viewport?.width;
+    if (typeof w === "number" && !isNaN(w) && w > 0) {
+      countByWidth.set(w, (countByWidth.get(w) || 0) + 1);
+    }
+  }
+
+  return Array.from(countByWidth.entries())
+    .map(([width, count]) => ({ width, count }))
+    .sort((a, b) => b.width - a.width);
 }
 
 /**
- * Calculates logical preview container dimensions based on profile and event metadata.
+ * Filters click events by responsive viewport profile and optional width-matched resolution.
  *
  * @param {Array} events
- * @param {"all" | "desktop" | "mobile"} profile
- * @returns {{ width: number, height: number }}
+ * @param {"all" | "desktop" | "mobile"} [profile="all"]
+ * @param {number|null|"approximate"} [selectedWidth=null]
+ * @returns {Array}
  */
-export function calculatePreviewDimensions(events = [], profile = "all") {
-  const profileWidth = profile === "mobile" ? 390 : 1200;
+export function filterEventsByViewport(events = [], profile = "all", selectedWidth = null) {
+  if (!Array.isArray(events)) return [];
 
-  // Derive height from recorded pageDimensions of matching events
+  let filtered = events;
+  if (profile !== "all") {
+    filtered = filtered.filter((ev) => {
+      const width = ev.viewport?.width;
+      const category = classifyViewport(width);
+      return category === profile;
+    });
+  }
+
+  if (typeof selectedWidth === "number" && selectedWidth > 0) {
+    filtered = filtered.filter((ev) => ev.viewport?.width === selectedWidth);
+  }
+
+  return filtered;
+}
+
+/**
+ * Calculates logical preview container dimensions based on profile, selected width, and event metadata.
+ *
+ * @param {Array} events
+ * @param {"all" | "desktop" | "mobile"} [profile="all"]
+ * @param {number|null|"approximate"} [selectedWidth=null]
+ * @returns {{ width: number, height: number, isWidthMatched: boolean }}
+ */
+export function calculatePreviewDimensions(events = [], profile = "all", selectedWidth = null) {
+  const isWidthMatched = typeof selectedWidth === "number" && selectedWidth > 0;
+  let profileWidth = 1200;
+
+  if (isWidthMatched) {
+    profileWidth = selectedWidth;
+  } else if (profile === "mobile") {
+    profileWidth = 390;
+  }
+
+  // Derive height from recorded pageDimensions of matching events only
   const validHeights = events
     .map((e) => e.pageDimensions?.height)
     .filter((h) => typeof h === "number" && h > 0);
 
   let derivedHeight = 2000;
   if (validHeights.length > 0) {
-    // Use the maximum recorded height or at least 1400px
+    // Use the maximum recorded height within this event population or at least 1400px
     const maxHeight = Math.max(...validHeights);
     derivedHeight = Math.max(1400, Math.min(6000, maxHeight));
-  } else if (profile === "mobile") {
+  } else if (profile === "mobile" || (isWidthMatched && selectedWidth < 768)) {
     derivedHeight = 2400; // Mobile pages are typically taller vertically
   }
 
   return {
     width: profileWidth,
     height: derivedHeight,
+    isWidthMatched,
   };
+}
+
+/**
+ * Projects an event's click coordinates onto preview canvas coordinates.
+ *
+ * For width-matched previews where preview width equals recorded document or viewport width,
+ * uses direct 1-to-1 pixel coordinates to guarantee sub-pixel alignment across centered
+ * containers and complex CSS layouts.
+ *
+ * When source and destination widths genuinely differ (e.g. aggregate approximate mode),
+ * applies proportional normalization with safe clamping.
+ *
+ * @param {object} event
+ * @param {{ width: number, height: number }} previewDims
+ * @returns {{
+ *   x: number,
+ *   y: number,
+ *   system: "document" | "viewport",
+ *   isExact: boolean
+ * } | null}
+ */
+export function projectClickToCanvas(event, previewDims) {
+  if (!event || !event.click || !previewDims) return null;
+  const { click, pageDimensions, viewport } = event;
+  const destWidth = previewDims.width;
+  const destHeight = previewDims.height;
+
+  if (
+    typeof destWidth !== "number" ||
+    isNaN(destWidth) ||
+    destWidth <= 0 ||
+    typeof destHeight !== "number" ||
+    isNaN(destHeight) ||
+    destHeight <= 0
+  ) {
+    return null;
+  }
+
+  const hasPageX = typeof click.pageX === "number" && !isNaN(click.pageX) && click.pageX >= 0;
+  const hasPageY = typeof click.pageY === "number" && !isNaN(click.pageY) && click.pageY >= 0;
+  const srcDocWidth = pageDimensions?.width;
+  const srcDocHeight = pageDimensions?.height;
+  const hasValidPageDims =
+    typeof srcDocWidth === "number" &&
+    srcDocWidth > 0 &&
+    typeof srcDocHeight === "number" &&
+    srcDocHeight > 0;
+
+  // 1. Primary: Document-relative coordinates
+  if (hasPageX && hasPageY) {
+    let x, y;
+    let isExact = false;
+
+    // Check if destination width matches source recorded width (width-matched mode)
+    const isExactWidth =
+      (hasValidPageDims && srcDocWidth === destWidth) ||
+      (viewport?.width === destWidth);
+
+    if (isExactWidth) {
+      x = click.pageX;
+      isExact = true;
+    } else if (hasValidPageDims) {
+      const normX = Math.max(0, Math.min(1, click.pageX / srcDocWidth));
+      x = normX * destWidth;
+    } else if (typeof viewport?.width === "number" && viewport.width > 0) {
+      const normX = Math.max(0, Math.min(1, click.pageX / viewport.width));
+      x = normX * destWidth;
+    } else {
+      return null;
+    }
+
+    // Height projection
+    if (hasValidPageDims && srcDocHeight === destHeight) {
+      y = click.pageY;
+    } else if (hasValidPageDims) {
+      const normY = Math.max(0, Math.min(1, click.pageY / srcDocHeight));
+      y = normY * destHeight;
+    } else {
+      y = click.pageY;
+    }
+
+    // Clamp within destination canvas boundary
+    x = Math.max(0, Math.min(destWidth, x));
+    y = Math.max(0, Math.min(destHeight, y));
+
+    return {
+      x,
+      y,
+      system: "document",
+      isExact,
+    };
+  }
+
+  // 2. Fallback: Viewport-relative coordinates (when pageX/pageY absent)
+  const hasViewX = typeof click.x === "number" && !isNaN(click.x) && click.x >= 0;
+  const hasViewY = typeof click.y === "number" && !isNaN(click.y) && click.y >= 0;
+  const vWidth = viewport?.width;
+  const vHeight = viewport?.height;
+  const hasValidViewportDims =
+    typeof vWidth === "number" && vWidth > 0 && typeof vHeight === "number" && vHeight > 0;
+
+  if (hasViewX && hasViewY && hasValidViewportDims) {
+    let x, y;
+    let isExact = false;
+
+    if (vWidth === destWidth) {
+      x = click.x;
+      isExact = true;
+    } else {
+      x = Math.max(0, Math.min(1, click.x / vWidth)) * destWidth;
+    }
+
+    if (vHeight === destHeight) {
+      y = click.y;
+    } else {
+      y = Math.max(0, Math.min(1, click.y / vHeight)) * destHeight;
+    }
+
+    x = Math.max(0, Math.min(destWidth, x));
+    y = Math.max(0, Math.min(destHeight, y));
+
+    return {
+      x,
+      y,
+      system: "viewport",
+      isExact,
+    };
+  }
+
+  return null;
 }
 
 /**

@@ -18,6 +18,8 @@ import {
   calculatePreviewDimensions,
   computeHeatmapSummary,
   drawHeatmapToCanvas,
+  getAvailableViewportWidths,
+  projectClickToCanvas,
 } from "../utils/heatmapUtils.js";
 
 export function HeatmapPage() {
@@ -28,6 +30,7 @@ export function HeatmapPage() {
 
   // Filters & display options
   const [viewportProfile, setViewportProfile] = useState("all"); // "all" | "desktop" | "mobile"
+  const [selectedWidth, setSelectedWidth] = useState("approximate"); // number | "approximate"
   const [showPinpoints, setShowPinpoints] = useState(true);
   const [hotspotRadius, setHotspotRadius] = useState(26);
   const [showIframe, setShowIframe] = useState(true);
@@ -141,10 +144,32 @@ export function HeatmapPage() {
     };
   }, [selectedPageUrl, loadClicksForPage]);
 
+  // Available widths recorded for current profile
+  const availableWidths = getAvailableViewportWidths(clicks, viewportProfile);
+  const clicksInProfile = filterEventsByViewport(clicks, viewportProfile, null);
+
+  // Active width: ensure selected width is valid for current profile
+  const activeSelectedWidth =
+    typeof selectedWidth === "number" && availableWidths.some((w) => w.width === selectedWidth)
+      ? selectedWidth
+      : selectedWidth === "approximate"
+      ? "approximate"
+      : "approximate";
+
+  const isWidthMatched = typeof activeSelectedWidth === "number";
+
   // Calculate filtered events and metrics
-  const filteredEvents = filterEventsByViewport(clicks, viewportProfile);
+  const filteredEvents = filterEventsByViewport(
+    clicks,
+    viewportProfile,
+    isWidthMatched ? activeSelectedWidth : null
+  );
   const summary = computeHeatmapSummary(clicks);
-  const previewDims = calculatePreviewDimensions(filteredEvents, viewportProfile);
+  const previewDims = calculatePreviewDimensions(
+    filteredEvents,
+    viewportProfile,
+    isWidthMatched ? activeSelectedWidth : null
+  );
 
   // Selected page metadata from pages list
   const selectedPageMeta = pages.find((p) => p.pageUrl === selectedPageUrl) || null;
@@ -158,14 +183,14 @@ export function HeatmapPage() {
     canvas.width = previewDims.width;
     canvas.height = previewDims.height;
 
-    // Map each filtered click event to canvas (x, y)
+    // Map each filtered click event to canvas (x, y) using resolution-aware projection
     const points = [];
     for (const ev of filteredEvents) {
-      const norm = normalizeClickCoordinate(ev);
-      if (norm) {
+      const proj = projectClickToCanvas(ev, previewDims);
+      if (proj) {
         points.push({
-          x: norm.normX * previewDims.width,
-          y: norm.normY * previewDims.height,
+          x: proj.x,
+          y: proj.y,
         });
       }
     }
@@ -293,8 +318,47 @@ export function HeatmapPage() {
                 </div>
                 <div className="viewport-hint">
                   {viewportProfile === "all" && "All viewports aggregated (responsive reflows may shift elements)"}
-                  {viewportProfile === "desktop" && "Desktop events: width ≥ 1024 CSS px (1200px preview)"}
-                  {viewportProfile === "mobile" && "Mobile events: width < 768 CSS px (390px mobile preview)"}
+                  {viewportProfile === "desktop" && "Desktop events: width ≥ 1024 CSS px"}
+                  {viewportProfile === "mobile" && "Mobile events: width < 768 CSS px"}
+                </div>
+              </div>
+
+              {/* Resolution / Width-Matched Selector */}
+              <div className="control-group resolution-filter-group">
+                <label htmlFor="heatmap-resolution-select" className="control-label">
+                  Preview Resolution:
+                </label>
+                <div className="select-wrapper">
+                  <select
+                    id="heatmap-resolution-select"
+                    value={activeSelectedWidth}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedWidth(val === "approximate" ? "approximate" : Number(val));
+                    }}
+                    className="select-input"
+                    disabled={loadingClicks || refreshing || clicks.length === 0}
+                  >
+                    <option value="approximate">
+                      All Widths (Approximate) — {clicksInProfile.length} clicks
+                    </option>
+                    {availableWidths.map(({ width, count }) => (
+                      <option key={width} value={width}>
+                        {width}px Width-Matched (Exact) — {count} clicks
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="viewport-hint">
+                  {isWidthMatched ? (
+                    <span style={{ color: "#10b981", fontWeight: 600 }}>
+                      🎯 {previewDims.width}px Matched ({filteredEvents.length} clicks) — Sub-pixel aligned
+                    </span>
+                  ) : (
+                    <span style={{ color: "#d97706" }}>
+                      ⚠️ {previewDims.width}px Preview (Approximate across {availableWidths.length} widths)
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -343,7 +407,11 @@ export function HeatmapPage() {
               </div>
               <div className="metric-value">{filteredEvents.length}</div>
               <div className="metric-caption">
-                {viewportProfile === "all" ? "Across all device sizes" : `Matching ${viewportProfile} profile`}
+                {isWidthMatched
+                  ? `Matching ${previewDims.width}px resolution`
+                  : viewportProfile === "all"
+                  ? "Across all device sizes"
+                  : `Matching ${viewportProfile} profile`}
               </div>
             </div>
 
@@ -369,14 +437,16 @@ export function HeatmapPage() {
 
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-label">Coordinate System</span>
-                <span className="metric-badge">Precision</span>
+                <span className="metric-label">Preview Mode</span>
+                <span className="metric-badge">{isWidthMatched ? "Exact" : "Approximate"}</span>
               </div>
               <div className="metric-value">
-                {summary.withDocCoords > 0 ? "Document" : "Viewport"}
+                {isWidthMatched ? `${previewDims.width}px` : "Multi-Width"}
               </div>
               <div className="metric-caption">
-                {summary.withDocCoords} scroll-adjusted ({summary.withViewportFallback} fallback)
+                {isWidthMatched
+                  ? `${filteredEvents.length} clicks at recorded resolution`
+                  : `Aggregate view (${availableWidths.length} recorded widths)`}
               </div>
             </div>
           </div>
@@ -388,6 +458,16 @@ export function HeatmapPage() {
               <div className="alert-text">
                 <strong>High Click Density Truncation:</strong> This page exceeds the maximum
                 API query threshold of 5,000 click events. The most recent 5,000 clicks are rendered.
+              </div>
+            </div>
+          )}
+
+          {/* Approximate Multi-Width Warning Banner */}
+          {!isWidthMatched && availableWidths.length > 1 && (
+            <div className="truncation-alert approximate-alert">
+              <span className="alert-icon">ℹ️</span>
+              <div className="alert-text">
+                <strong>Multi-Resolution Aggregate View (Approximate):</strong> Clicks recorded across {availableWidths.length} different screen widths ({availableWidths.map((w) => `${w.width}px`).join(", ")}) are projected onto an aggregate {previewDims.width}px preview. Responsive element reflows and container margins may shift elements. For sub-pixel element alignment, select a width-matched resolution above.
               </div>
             </div>
           )}
@@ -438,7 +518,7 @@ export function HeatmapPage() {
                   <span className="legend-label">High</span>
                 </div>
                 <div className="legend-dimensions-tag">
-                  Preview Canvas: {previewDims.width}px &times; {previewDims.height}px
+                  Preview Frame: {previewDims.width}px &times; {previewDims.height}px {isWidthMatched ? "(Width-Matched: Exact Alignment)" : "(Aggregate: Approximate)"}
                 </div>
               </div>
 

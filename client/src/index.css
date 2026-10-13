@@ -1234,8 +1234,8 @@ body {
 
 .controls-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1.2fr 1fr;
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -1482,6 +1482,7 @@ body {
   border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
+  margin: 0 auto;
   transition: width 0.2s ease;
 }
 
