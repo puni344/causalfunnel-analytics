@@ -17,7 +17,7 @@ const envSchema = z.object({
     .pipe(z.number().int().min(1).max(65535)),
 
   MONGODB_URI: z
-    .string({ required_error: "MONGODB_URI is required" })
+    .string({ message: "MONGODB_URI is required" })
     .min(1, "MONGODB_URI must not be empty")
     .startsWith("mongodb", "MONGODB_URI must start with 'mongodb'"),
 

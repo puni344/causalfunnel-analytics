@@ -80,13 +80,14 @@ export function SessionsPage({ onSelectSession }) {
 
       setSessions(result.data || []);
       setPagination(result.pagination || { page: targetPage, limit: 20, total: 0 });
+      setLoading(false);
+      setRefreshing(false);
     } catch (err) {
       if (err.name !== "AbortError") {
         setError(err.message || "Failed to retrieve session data from the server.");
+        setLoading(false);
+        setRefreshing(false);
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 

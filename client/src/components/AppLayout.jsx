@@ -10,13 +10,13 @@ export function AppLayout({ activeTab, onSelectTab, children }) {
       <div className="main-content-wrapper">
         <header className="top-header">
           <div className="top-header-left">
-            <span className="environment-tag">Live Mode</span>
+            <span className="environment-tag">Analytics Dashboard</span>
             <span className="server-endpoint-info">
-              Connected to <code>{API_BASE_URL}</code>
+              API Base: <code>{API_BASE_URL}</code>
             </span>
           </div>
           <div className="top-header-right">
-            <span className="badge-database">MongoDB Atlas</span>
+            <span className="badge-database">CausalFunnel Analytics</span>
           </div>
         </header>
         <main className="main-page-content">{children}</main>

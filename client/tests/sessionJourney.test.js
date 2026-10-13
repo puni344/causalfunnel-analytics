@@ -14,8 +14,6 @@ import {
   formatUrl,
   formatFullDate,
   formatTimeOnly,
-  sortEventsChronologically,
-  deriveJourneySummary,
 } from "../src/utils/journeyUtils.js";
 
 describe("Session Journey — Routing & Route Parsing", () => {

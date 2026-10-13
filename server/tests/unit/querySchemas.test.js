@@ -93,9 +93,14 @@ describe("clicksQuerySchema", () => {
     assert.strictEqual(httpsRes.success, true);
   });
 
-  it("rejects missing or empty pageUrl", () => {
-    assert.strictEqual(clicksQuerySchema.safeParse({}).success, false);
-    assert.strictEqual(clicksQuerySchema.safeParse({ pageUrl: "" }).success, false);
+  it("rejects missing or empty pageUrl with custom error message", () => {
+    const missingRes = clicksQuerySchema.safeParse({});
+    assert.strictEqual(missingRes.success, false);
+    assert.strictEqual(missingRes.error.issues[0].message, "pageUrl query parameter is required");
+
+    const emptyRes = clicksQuerySchema.safeParse({ pageUrl: "" });
+    assert.strictEqual(emptyRes.success, false);
+    assert.strictEqual(emptyRes.error.issues[0].message, "pageUrl cannot be empty");
   });
 
   it("rejects non-HTTP protocols (e.g., ftp://, javascript:)", () => {
@@ -105,5 +110,17 @@ describe("clicksQuerySchema", () => {
 
   it("rejects malformed URLs", () => {
     assert.strictEqual(clicksQuerySchema.safeParse({ pageUrl: "not-a-valid-url" }).success, false);
+  });
+
+  it("validates sessionId required error message", () => {
+    const missingSessionRes = sessionIdParamSchema.safeParse(undefined);
+    assert.strictEqual(missingSessionRes.success, false);
+    assert.strictEqual(missingSessionRes.error.issues[0].message, "sessionId is required");
+  });
+
+  it("validates pagination invalid number message", () => {
+    const invalidPageRes = paginationQuerySchema.safeParse({ page: "not-a-num" });
+    assert.strictEqual(invalidPageRes.success, false);
+    assert.strictEqual(invalidPageRes.error.issues[0].message, "page must be a number");
   });
 });

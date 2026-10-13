@@ -231,9 +231,33 @@
       const viewport = getViewportDimensions();
       const pageDimensions = getPageDimensions(viewport);
 
-      // Viewport-relative coordinates (clamped within [0, viewport])
-      const clientX = typeof e.clientX === "number" ? Math.round(e.clientX) : 0;
-      const clientY = typeof e.clientY === "number" ? Math.round(e.clientY) : 0;
+      // Viewport-relative coordinates
+      let clientX = typeof e.clientX === "number" ? Math.round(e.clientX) : 0;
+      let clientY = typeof e.clientY === "number" ? Math.round(e.clientY) : 0;
+
+      // Safe target extraction
+      const targetEl = e.target || e.srcElement;
+
+      // When a click is keyboard-triggered (e.g. Enter or Space key press on a focused element),
+      // browsers dispatch a synthetic click with clientX=0 and clientY=0.
+      // Fallback to the target element's bounding-box center to avoid recording false (0, 0) coordinates.
+      if (
+        clientX === 0 &&
+        clientY === 0 &&
+        targetEl &&
+        typeof targetEl.getBoundingClientRect === "function"
+      ) {
+        try {
+          const rect = targetEl.getBoundingClientRect();
+          if (rect && (rect.width > 0 || rect.height > 0)) {
+            clientX = Math.round(rect.left + rect.width / 2);
+            clientY = Math.round(rect.top + rect.height / 2);
+          }
+        } catch (_rectErr) {
+          // Keep existing coordinates if getBoundingClientRect fails
+        }
+      }
+
       const x = Math.max(0, Math.min(clientX, viewport.width));
       const y = Math.max(0, Math.min(clientY, viewport.height));
 
@@ -250,15 +274,17 @@
         0;
 
       const rawPageX =
-        typeof e.pageX === "number" ? Math.round(e.pageX) : clientX + scrollX;
+        typeof e.pageX === "number" && (e.pageX !== 0 || clientX === 0)
+          ? Math.round(e.pageX)
+          : clientX + scrollX;
       const rawPageY =
-        typeof e.pageY === "number" ? Math.round(e.pageY) : clientY + scrollY;
+        typeof e.pageY === "number" && (e.pageY !== 0 || clientY === 0)
+          ? Math.round(e.pageY)
+          : clientY + scrollY;
 
       const pageX = Math.max(0, rawPageX);
       const pageY = Math.max(0, rawPageY);
 
-      // Safe target extraction
-      const targetEl = e.target || e.srcElement;
       let tag = "UNKNOWN";
       let id = "";
       let className = "";

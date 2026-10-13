@@ -12,8 +12,6 @@ import { ErrorState } from "../components/ErrorState.jsx";
 import { EmptyState } from "../components/EmptyState.jsx";
 import { formatUrl } from "../utils/journeyUtils.js";
 import {
-  classifyViewport,
-  normalizeClickCoordinate,
   filterEventsByViewport,
   calculatePreviewDimensions,
   computeHeatmapSummary,
@@ -199,7 +197,7 @@ export function HeatmapPage() {
       radius: hotspotRadius,
       showPinpoints,
     });
-  }, [filteredEvents, previewDims.width, previewDims.height, hotspotRadius, showPinpoints]);
+  }, [filteredEvents, previewDims, hotspotRadius, showPinpoints]);
 
   const handlePageSelectChange = (e) => {
     setSelectedPageUrl(e.target.value);
@@ -219,8 +217,10 @@ export function HeatmapPage() {
       <div className="page-header heatmap-header">
         <div>
           <div className="heatmap-badge-row">
-            <span className="badge badge-heatmap">Stage 7</span>
-            <span className="heatmap-status-indicator">● Live Hotspots</span>
+            <span className="badge badge-heatmap">Click Heatmap</span>
+            <span className="heatmap-status-indicator">
+              {isWidthMatched ? "● Width-matched preview" : "● Aggregate preview"}
+            </span>
           </div>
           <h1 className="page-title">Interactive Click Heatmap</h1>
           <p className="page-description">
@@ -402,7 +402,7 @@ export function HeatmapPage() {
           <div className="metrics-grid heatmap-metrics-grid">
             <div className="metric-card">
               <div className="metric-header">
-                <span className="metric-label">Hotspots Rendered</span>
+                <span className="metric-label">Clicks Plotted</span>
                 <span className="metric-badge">In View</span>
               </div>
               <div className="metric-value">{filteredEvents.length}</div>
@@ -520,6 +520,15 @@ export function HeatmapPage() {
                 <div className="legend-dimensions-tag">
                   Preview Frame: {previewDims.width}px &times; {previewDims.height}px {isWidthMatched ? "(Width-Matched: Exact Alignment)" : "(Aggregate: Approximate)"}
                 </div>
+                <a
+                  href={selectedPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline btn-xs preview-external-link"
+                  title="Open the live page in a new tab"
+                >
+                  Open Page in New Tab ↗
+                </a>
               </div>
 
               {/* Iframe Fallback Banner if embedding fails */}

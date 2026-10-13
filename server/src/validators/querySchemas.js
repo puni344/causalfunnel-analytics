@@ -23,7 +23,7 @@ export const paginationQuerySchema = z.object({
     .preprocess(
       (val) => (val === undefined || val === "" ? 1 : val),
       z.coerce
-        .number({ invalid_type_error: "page must be a number" })
+        .number({ message: "page must be a number" })
         .int("page must be an integer")
         .min(1, "page must be >= 1")
     ),
@@ -31,7 +31,7 @@ export const paginationQuerySchema = z.object({
     .preprocess(
       (val) => (val === undefined || val === "" ? 20 : val),
       z.coerce
-        .number({ invalid_type_error: "limit must be a number" })
+        .number({ message: "limit must be a number" })
         .int("limit must be an integer")
         .min(1, "limit must be >= 1")
         .max(100, "limit must be <= 100")
@@ -46,7 +46,7 @@ export const paginationQuerySchema = z.object({
  * - Characters: alphanumeric, underscores, hyphens only
  */
 export const sessionIdParamSchema = z
-  .string({ required_error: "sessionId is required" })
+  .string({ message: "sessionId is required" })
   .min(8, "sessionId must be 8–64 characters")
   .max(64, "sessionId must be 8–64 characters")
   .regex(
@@ -63,7 +63,7 @@ export const sessionIdParamSchema = z
  */
 export const clicksQuerySchema = z.object({
   pageUrl: z
-    .string({ required_error: "pageUrl query parameter is required" })
+    .string({ message: "pageUrl query parameter is required" })
     .min(1, "pageUrl cannot be empty")
     .max(2048, "pageUrl must be <= 2048 characters")
     .refine(

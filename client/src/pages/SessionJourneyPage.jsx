@@ -17,8 +17,6 @@ import {
   formatUrl,
   formatFullDate,
   formatTimeOnly,
-  sortEventsChronologically,
-  deriveJourneySummary,
 } from "../utils/journeyUtils.js";
 
 export function SessionJourneyPage({ sessionId, onBackToSessions }) {
