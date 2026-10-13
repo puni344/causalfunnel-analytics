@@ -21,7 +21,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const trackerPath = path.resolve(__dirname, "../../tracker/tracker.js");
+const trackerDir = path.resolve(__dirname, "../../tracker");
 const demoDirPath = path.resolve(__dirname, "../../demo");
 
 const app = express();
@@ -42,13 +42,19 @@ app.use(
 app.use(express.json({ limit: "100kb" }));
 
 // ── Static assets ─────────────────────────────────────────
-// Serves standalone plain-JS tracking script
+// Serves standalone plain-JS tracking script safely scoped to tracker directory
 app.get("/tracker.js", (_req, res) => {
-  res.sendFile(trackerPath, { dotfiles: "allow" });
+  res.sendFile("tracker.js", { root: trackerDir, dotfiles: "deny" });
 });
 
-// Serves the two-page demo website
-app.use("/demo", express.static(demoDirPath));
+// Serves the two-page demo website with dotfiles denied
+app.use(
+  "/demo",
+  express.static(demoDirPath, {
+    dotfiles: "deny",
+    index: "index.html",
+  })
+);
 
 // ── API Routes ────────────────────────────────────────────
 app.use("/api/health", healthRouter);

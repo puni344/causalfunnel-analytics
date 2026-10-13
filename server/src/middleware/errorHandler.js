@@ -30,15 +30,28 @@ export function errorHandler(err, _req, res, _next) {
 
   // Everything else
   const statusCode = err.statusCode || err.status || 500;
-  const message =
-    process.env.NODE_ENV === "production"
-      ? "Internal server error"
-      : err.message || "Internal server error";
+  const statusTitle =
+    statusCode === 403
+      ? "Forbidden"
+      : statusCode === 404
+      ? "Not Found"
+      : statusCode === 400
+      ? "Bad Request"
+      : statusCode >= 500
+      ? "Internal Server Error"
+      : "Error";
 
-  console.error("Unhandled error:", err);
+  const message =
+    process.env.NODE_ENV === "production" && statusCode >= 500
+      ? "Internal server error"
+      : err.message || statusTitle;
+
+  if (statusCode >= 500) {
+    console.error("Unhandled error:", err);
+  }
 
   return res.status(statusCode).json({
-    error: "Internal Server Error",
+    error: statusTitle,
     message,
   });
 }
